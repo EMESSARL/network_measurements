@@ -137,6 +137,21 @@ int handle_msg(struct message *m_in, struct message *m_out, int data_sd){
       m_out->result_str_len = strlen(m_out->result_str);
       m_out->result = OK;
       return fd;
+    case PUT:
+      fprintf(stderr, "params(%s)\n", m_in->params);
+      fd = open(m_in->params, O_WRONLY | O_CREAT);
+      if(fd < 0){
+        fprintf(stderr, "Error when opening (%s)\n", m_in->params);
+        m_out->result = E_IO;
+        strcpy(m_out->result_str, strerror(errno));
+        m_out->result_str_len = strlen(m_out->result_str);
+        return E_IO;
+      }
+      strcpy(m_out->result_str, strerror(errno));
+      m_out->result_str_len = strlen(m_out->result_str);
+      m_out->result = OK;
+      return fd;
+    
     default:
       fprintf(stderr, "Unkown commande");
       strcpy(m_out->result_str, "Server: Unkown command");

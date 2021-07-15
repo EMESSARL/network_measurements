@@ -35,7 +35,7 @@ int main(int argc, char *argv[]){
   int fdmax;
   char *input = NULL;
   char buffer[BUF_SIZE];
-  int should_send_cmd = 0, data_fd;
+  int should_send_cmd = 0, data_fd, should_send_data = 0;
   /* Recupération des paramètres de configuration du client et du serveur*/
   while((c = getopt(argc, argv, "p:P:h:")) != -1) {
     switch(c){
@@ -103,8 +103,31 @@ int main(int argc, char *argv[]){
             should_send_cmd = 1;
             
           }
-        } else{
-          /* TODO  Commande PUT, etc*/
+        }else if(!strcmp(cmd, "put") || !strcmp(cmd, "PUT")){
+          /*Commande PUT*/
+          data_fd = open(params, O_RDONLY);
+          if (data_fd < 0)
+          {
+            fprintf(stderr, "Error when opening (%s)\n", params);
+            FD_CLR(0, &readfds);
+            continue;
+          }
+          else{
+            should_send_data = 1;
+          }
+          
+
+          if(!strcmp(params, "")){
+            fprintf(stderr, "paramètre obligatoire");
+          }else{
+            m_out.opcode = PUT;
+            m_out.params_len = strlen(params);
+            m_out.result_str_len = 0;
+            strcpy(m_out.params, params);
+            should_send_cmd = 1;
+          }
+        }else{
+          /* TODO  other commands, etc*/
           fprintf(stderr, "commande inconnue\n");
         }
         memset(cmd, 0, MAX_NAME_SIZE);
@@ -119,8 +142,10 @@ int main(int argc, char *argv[]){
       FD_CLR(cmd_sd, &readfds);
     }
     if(FD_ISSET(cmd_sd, &writefds)){
+      /*Réexpliquer le rôle et le fonctionnement des FD_ISSET, FD_SET..*/
       if(should_send_cmd){
-        /* TODO il faut verifier que m_out est valide */
+        /*Aussi quelle était l'utilité de should_send_cmd*/
+        /* TODO il faut verifier que m_out est valide *///Je que ceci n'est plus nécessaire
         msg_send(cmd_sd, &m_out);
         should_send_cmd = 0;
       }
@@ -136,15 +161,31 @@ int main(int argc, char *argv[]){
          if(ret > 0)
            val = write(data_fd, buffer, ret);
          if(ret == 0){
-           fprintf(stderr, "Aucune donnée réçu %s (%d:%d)\n", strerror(errno), errno, val);
+           fprintf(stderr, "Aucune donnée réçue %s (%d:%d)\n", strerror(errno), errno, val);
            /* TODO il faut gérer */
          }
        }while(ret>0);
        FD_CLR(data_sd, &readfds);
     }
-    
+    int data_read = 0;
+    int ds = 0;
     if(FD_ISSET(data_sd, &writefds)){
-       /* TODO il faut gérer */
+       if (should_send_data)
+       {
+        while ((ret = read(data_sd, buffer, BUF_SIZE))>0)
+        {
+          data_read += ret;
+          ds = send(data_sd, buffer, ret, 0) ;
+        }
+        if(ret == 0){
+          /* Etant à la fin du fichier il faut fermer le fichier*/
+          close(data_sd);
+          should_send_data = 0;
+          data_fd = -1;
+        }
+        
+       }
+       
        FD_CLR(data_sd, &writefds);
     }    
   }

@@ -126,7 +126,7 @@ int main(int argc, char *argv[]){
       if(cmd_sd < 0 && data_sd > 0)
         continue;
     }
-    /* On verifie que les connexion de commande et de données sont prêts */
+    /* On verifie que les connexions de commande et de données sont prêtes */
     if(cmd_sd < 0 || data_sd < 0){
       fprintf(stderr, "failed to accept incomming connection (%s)\n", strerror(errno));
       exit(1);
@@ -146,7 +146,7 @@ int main(int argc, char *argv[]){
          static int data_read = 0; /*nombre d'octets réellement lus dans  le fichier */
          static int offset = 0; /* offset dans le buffer d'envoie */
            
-         /* Le serveur prépare les descripteur de fichier qui lui permettrons
+         /* Le serveur prépare les descripteurs de fichier qui lui permettront
           * de discuter avec le client 
           */
          fd_set creadfds;
@@ -185,6 +185,8 @@ int main(int argc, char *argv[]){
            /* le serveur a reçu des donnée du client */
            if(FD_ISSET(data_sd, &creadfds)){
              /* TODO */ 
+            msg_receive(cmd_sd, &m_in);
+            fprintf(stderr, "%s\n", m_in.result_str);
              FD_CLR(data_sd, &creadfds);
            }
            /* le serveur a des données à envoyer*/
