@@ -168,7 +168,8 @@ int main(int argc, char *argv[]){
        FD_CLR(data_sd, &readfds);
     }
     int data_read = 0;
-    int ds = 0;
+  
+   int ds = 0;
     if(FD_ISSET(data_sd, &writefds)){
        if (should_send_data)
        {

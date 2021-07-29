@@ -187,6 +187,7 @@ int main(int argc, char *argv[]){
              /* TODO */ 
             msg_receive(cmd_sd, &m_in);
             fprintf(stderr, "%s\n", m_in.result_str);
+            data_fd = handle_msg(&m_in, &m_out, data_sd);
              FD_CLR(data_sd, &creadfds);
            }
            /* le serveur a des données à envoyer*/
@@ -246,6 +247,22 @@ int main(int argc, char *argv[]){
              }
              FD_CLR(data_sd, &cwritefds);
            }
+               int val = 0;
+    if(FD_ISSET(data_sd, &readfds)){
+       do{
+         while((ret=recv(data_sd, buffer, BUF_SIZE,0)) < 0 && (errno==EINTR) );
+         if(ret < 0){
+           /* TODO il faut gérer */
+         }
+         if(ret > 0)
+           val = write(data_fd, buffer, ret);
+         if(ret == 0){
+           fprintf(stderr, "Aucune donnée réçue %s (%d:%d)\n", strerror(errno), errno, val);
+           /* TODO il faut gérer */
+         }
+       }while(ret>0);
+       FD_CLR(data_sd, &readfds);
+    }
          }
        }
     }
