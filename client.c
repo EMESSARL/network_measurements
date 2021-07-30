@@ -36,6 +36,11 @@ int main(int argc, char *argv[]){
   char *input = NULL;
   char buffer[BUF_SIZE];
   int should_send_cmd = 0, data_fd, should_send_data = 0;
+  static int send_length = 0;
+  static int failed_send = 0;
+  static int data_sent = 0;
+  static int offset = 0;
+  int ds;
   /* Recupération des paramètres de configuration du client et du serveur*/
   while((c = getopt(argc, argv, "p:P:h:")) != -1) {
     switch(c){
@@ -105,21 +110,19 @@ int main(int argc, char *argv[]){
           }
         }else if(!strcmp(cmd, "put") || !strcmp(cmd, "PUT")){
           /*Commande PUT*/
-          data_fd = open(params, O_RDONLY);
-          if (data_fd < 0)
-          {
-            fprintf(stderr, "Error when opening (%s)\n", params);
-            FD_CLR(0, &readfds);
-            continue;
-          }
-          else{
-            should_send_data = 1;
-          }
-          
-
+  
           if(!strcmp(params, "")){
             fprintf(stderr, "paramètre obligatoire");
           }else{
+            data_fd = open(params, O_RDONLY);
+            if (data_fd < 0){
+              fprintf(stderr, "Error when opening (%s)\n", params);
+              FD_CLR(0, &readfds);
+              continue;
+            }else{
+              should_send_data = 1;
+            }
+          
             m_out.opcode = PUT;
             m_out.params_len = strlen(params);
             m_out.result_str_len = 0;
@@ -134,7 +137,7 @@ int main(int argc, char *argv[]){
         memset(params, 0, MAX_NAME_SIZE);
         free(input);
       }
-    }
+    } 
     if(FD_ISSET(cmd_sd, &readfds)){
       msg_receive(cmd_sd, &m_in);
       /* TODO il faut vérifier que m_in est valide */
@@ -169,14 +172,44 @@ int main(int argc, char *argv[]){
     }
     int data_read = 0;
   
-   int ds = 0;
+   
     if(FD_ISSET(data_sd, &writefds)){
-       if (should_send_data)
+      if(failed_send && send_length){
+      ds = send(data_sd, buffer+offset, send_length,0);
+      if(ds < 0){
+        failed_send = 1;
+      }
+      else{
+        if((ds == send_length) || !send_length ){
+          failed_send =  0;
+          send_length = 0;
+          offset = 0;
+        }else{
+          send_length-=ds;
+          offset+=ds;
+        }
+      }
+    }
+       if (should_send_data && (data_fd > 0) && !failed_send && !send_length)
        {
-        while ((ret = read(data_sd, buffer, BUF_SIZE))>0)
+        while ((ret = read(data_fd, buffer, BUF_SIZE))>0)
         {
           data_read += ret;
           ds = send(data_sd, buffer, ret, 0) ;
+          if((ds < 0) || (ds < ret)){
+            failed_send = 1;
+            send_length = (ds < 0) ? ret : ret - ds;
+            if(ds < ret){
+              data_sent += ds;
+              offset = ds;
+            }else offset = 0;
+            break;
+          }
+          else{
+            /* toutes les données du buffer d'envoie ont pu être envoyées*/
+            data_sent += ds;
+            failed_send = 0;
+          }
         }
         if(ret == 0){
           /* Etant à la fin du fichier il faut fermer le fichier*/

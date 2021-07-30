@@ -151,7 +151,7 @@ int handle_msg(struct message *m_in, struct message *m_out, int data_sd){
       m_out->result_str_len = strlen(m_out->result_str);
       m_out->result = OK;
       return fd;
-    
+     
     default:
       fprintf(stderr, "Unkown commande");
       strcpy(m_out->result_str, "Server: Unkown command");
