@@ -1,4 +1,8 @@
-### Compile file 
+### Pre-requis
+```
+sudo apt-get install  libreadline-dev
+```
+### Compile 
 ```
 $ make
 ```
