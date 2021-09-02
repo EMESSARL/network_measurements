@@ -16,26 +16,29 @@
 
 
 #define MAXLINE 200
-#define MAX_PORT_SIZE 6
-#define MAX_NAME_SIZE 255
+
 
 static int TCP_Connect(int af, char *server_ipaddr, char *server_port);
 
 
 int main(int argc, char *argv[]){
-  int cmd_sd, data_sd, ret;
-  char port1[MAX_PORT_SIZE], port2[MAX_PORT_SIZE];
-  char host[MAX_NAME_SIZE];
-  char cmd[MAX_NAME_SIZE];
-  char params [MAX_NAME_SIZE];
-  char c;
+  int cmd_sd, data_sd;
+  ssize_t ret, val;
+  char port1[MAX_PORT_SIZE+1], port2[MAX_PORT_SIZE+1];
+  char host[MAX_NAME_SIZE+1];
+  char cmd[MAX_NAME_SIZE+1];
+  char params [MAX_NAME_SIZE+1];
+  int c;
   struct message m_out, m_in; 
   fd_set readfds;
   fd_set writefds;
   int fdmax;
   char *input = NULL;
   char buffer[BUF_SIZE];
-  int should_send_cmd = 0, data_fd;
+  int should_send_cmd = 0, data_fd = -1;
+  memset(port1, 0, MAX_PORT_SIZE+1);
+  memset(port2, 0, MAX_PORT_SIZE+1);
+  memset(host, 0, MAX_NAME_SIZE+1);
   /* Recupération des paramètres de configuration du client et du serveur*/
   while((c = getopt(argc, argv, "p:P:h:")) != -1) {
     switch(c){
@@ -52,6 +55,11 @@ int main(int argc, char *argv[]){
         break;  
     }
   }
+  if(!port1[0]  || !port2[0] || !host[0]){
+     fprintf(stderr, "usage: %s -h servername -p port1 -P port2\n", argv[0]);
+     exit(0);
+  }
+  
   /* 
    * Vérification des paramètres de configuration du client et du serveur
    * Connexion au serveur
@@ -90,7 +98,7 @@ int main(int argc, char *argv[]){
             fprintf(stderr, "parametre obligatoire\n");
           }
           else{
-            data_fd = open(params, O_CREAT | O_WRONLY);
+            data_fd = open(params, O_CREAT,  O_WRONLY);
             if(data_fd < 0){
               fprintf(stderr, "Erreur I/O: %s\n", strerror(errno));
               FD_CLR(0, &readfds);
@@ -126,17 +134,16 @@ int main(int argc, char *argv[]){
       }
       FD_CLR(cmd_sd, &writefds);
     }
-    int val = 0;
     if(FD_ISSET(data_sd, &readfds)){
        do{
          while((ret=recv(data_sd, buffer, BUF_SIZE,0)) < 0 && (errno==EINTR) );
          if(ret < 0){
            /* TODO il faut gérer */
          }
-         if(ret > 0)
-           val = write(data_fd, buffer, ret);
+         if(ret > 0 && data_fd > 0)
+           val = write(data_fd, buffer, (size_t)ret);
          if(ret == 0){
-           fprintf(stderr, "Aucune donnée réçu %s (%d:%d)\n", strerror(errno), errno, val);
+           fprintf(stderr, "Aucune donnée réçu %s (%d:%ld)\n", strerror(errno), errno, val);
            /* TODO il faut gérer */
          }
        }while(ret>0);

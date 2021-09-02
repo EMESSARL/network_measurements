@@ -16,7 +16,7 @@ int resolve_address(struct sockaddr *sa, socklen_t *salen, const char *host,
      fprintf(stderr, "failed to resolve address :%s:%s\n", host, port);
      return -1;
   }
-  memcpy(sa, res->ai_addr, res->ai_addrlen);
+  memcpy(sa, res->ai_addr, (size_t)res->ai_addrlen);
   *salen = res->ai_addrlen;
   freeaddrinfo(res);
   return 0;

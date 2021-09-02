@@ -7,10 +7,13 @@
 /*Definitions needed by clients and servers*/
 #define TRUE            1
 #define MAX_PATH      255 /*Maximum length of file name*/
-#define BUF_SIZE     8192 /* How much data to transfer at once*/
+#define BUF_SIZE     (size_t)8192 /* How much data to transfer at once*/
 #define E_BAD_OPCODE -1  /* Unknown operation requested*/
 #define E_BAD_PARAM -2   /* error in a parameter*/
 #define E_IO        -3   /* disk error or other I/O error*/
+
+#define MAX_PORT_SIZE (size_t)8
+#define MAX_NAME_SIZE (size_t)255
 
 /* definitions of the allowed operations*/
 enum{
@@ -33,8 +36,8 @@ enum{
 struct message{
   long opcode;     /* requested operation */
   long result;     /* result of the operation */
-  long params_len;   /* name len */
-  long result_str_len;
+  size_t params_len;   /* name len */
+  size_t result_str_len;
   char params[MAX_PATH];  /*name of the file being operated on */
   char result_str[MAX_PATH];
 };
@@ -48,5 +51,5 @@ void init_params(int recv_log_, int sent_log_);
 int set_recv_data(int recv_data);
 int print_recv_log(void);
 int print_sent_log(void);
-int handle_msg(struct message *m_in, struct message *m_out, int data_sd);
+int handle_msg(struct message *m_in, struct message *m_out);
 #endif

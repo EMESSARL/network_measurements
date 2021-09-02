@@ -16,8 +16,6 @@
 #include "message.h"
 
 #define BACKLOG_SIZE 10
-#define MAX_PORT_SIZE 6
-#define MAX_HOST_NAME_SIZE 255
 
 
 static int tcp_listen(char *server_ipaddr, char *server_port);
@@ -26,11 +24,11 @@ static int tcp_listen(char *server_ipaddr, char *server_port);
 int main(int argc, char *argv[]){
   socklen_t len;
   struct sockaddr  client1, client2;
-  char host[MAX_HOST_NAME_SIZE];
+  char host[MAX_NAME_SIZE+1];
   /*
    * le serveur ecoute sur le port1 pour recevoir les commandes
    * le serveur écoute sur le port2 pour recevoir les donnees*/
-  char port1[MAX_PORT_SIZE], port2[MAX_PORT_SIZE]; 
+  char port1[MAX_PORT_SIZE+1], port2[MAX_PORT_SIZE+1]; 
   
   /* sock1: est le socket sur lequel le serveur attent les connexions clientes
    *        pour les commandes
@@ -48,11 +46,11 @@ int main(int argc, char *argv[]){
   /* pid du processus qui sera créé pour gérer les connexions clientes */
   int child;
   /* caractère pour gérer les options en lignes de commande avec opts*/
-  char c;
+  int c;
   /* descripteur du fichier à recevoir par la commande GET*/
   int data_fd = -1;
   /* Variable  pour  récupérer le resultat des appels systèmes*/
-  int ret;
+  ssize_t ret;
   /* structure de données pour gérer les entrées sortie async sur les socket 
    * sock1 et sock2. A l'aide de l'appel système select le serveur ne fait 
    * l'appel à accept que si il ya une connexion entrante
@@ -66,9 +64,12 @@ int main(int argc, char *argv[]){
    */
   int should_send_cmd = 0, should_send_data = 0;
   /* mémoire tampon pour l'envoie et la réception*/
-  char buffer[BUF_SIZE];
+  char buffer[BUF_SIZE+1];
   /* message pour récupérer les requêtes et envoyer les réponses */
   struct message m_in, m_out;
+  memset(port1, 0, MAX_PORT_SIZE+1);
+  memset(port2, 0, MAX_PORT_SIZE+1);
+  memset(host, 0, MAX_NAME_SIZE+1);
   /* Gestion des options en ligne de commande */
   while((c = getopt(argc, argv, "p:P:h:")) != -1) {
     switch(c){
@@ -79,16 +80,22 @@ int main(int argc, char *argv[]){
         strncpy(port2, optarg, MAX_PORT_SIZE);
         break;
       case 'h':
-        strncpy(host, optarg, MAX_HOST_NAME_SIZE);
+        strncpy(host, optarg, MAX_NAME_SIZE);
         break;
       default:
         break;
       
     }
   }
+ 
   /* le serveur spécifie au système qu'il écoute les ports port1 et port2*/
+  if(!port1[0]  || !port2[0] || !host[0]){
+     fprintf(stderr, "usage: %s -h servername -p port1 -P port2\n", argv[0]);
+     exit(0);
+  }
   sock1 = tcp_listen(host, port1);
   sock2 = tcp_listen(host, port2);
+  
   /* les sock1 et sock2 sont non bloquants cela signifie qu'il retourne lorsque
    * la ressource demandée lors d'un appel système n'est pas disponible sans
    * bloquer le processus
@@ -139,12 +146,12 @@ int main(int argc, char *argv[]){
          exit(1);
        }
        if(child == 0){
-         static int data_sent = 0; /**nbre d'octets dejà envoyés pas le serveur**/
+         static ssize_t data_sent = 0; /**nbre d'octets dejà envoyés pas le serveur**/
          static int failed_send = 0; /** l'appel système send() a echoué **/
-         static int send_length = 0; /** la taille des données à renvoyer suite à l'échec de send() **/
-         int ds; /*nbre d'octets réellement envoyés par l'appel système send() */
-         static int data_read = 0; /*nombre d'octets réellement lus dans  le fichier */
-         static int offset = 0; /* offset dans le buffer d'envoie */
+         static ssize_t send_length = 0; /** la taille des données à renvoyer suite à l'échec de send() **/
+         ssize_t ds; /*nbre d'octets réellement envoyés par l'appel système send() */
+         static ssize_t data_read = 0; /*nombre d'octets réellement lus dans  le fichier */
+         static ssize_t offset = 0; /* offset dans le buffer d'envoie */
            
          /* Le serveur prépare les descripteur de fichier qui lui permettrons
           * de discuter avec le client 
@@ -167,7 +174,7 @@ int main(int argc, char *argv[]){
            /* Le serveur vient de recevoir une commande d'un client */
            if(FD_ISSET(cmd_sd, &creadfds)){
              msg_receive(cmd_sd, &m_in);
-             data_fd = handle_msg(&m_in, &m_out, data_sd);
+             data_fd = handle_msg(&m_in, &m_out);
              should_send_cmd = 1;
              if(data_fd > 0)
                should_send_data = 1;
@@ -192,8 +199,8 @@ int main(int argc, char *argv[]){
              /* l'appel système send() avait entre temps échoué, il faut renvoyer
               * les données qui ont échouées et qui sont dans le buffer d'envoie
               */
-             if(failed_send && send_length){
-                ds = send(data_sd, buffer+offset, send_length,0);
+             if(failed_send && send_length>0){
+                ds = send(data_sd, buffer+offset, (size_t)send_length,0);
                 if(ds < 0){
                    failed_send = 1;
                }
@@ -215,7 +222,7 @@ int main(int argc, char *argv[]){
              if(should_send_data && (data_fd > 0) && !failed_send && !send_length){
                while((ret = read(data_fd, buffer, BUF_SIZE)) > 0){
                  data_read += ret;
-                 ds = send(data_sd, buffer, ret,0);
+                 ds = send(data_sd, buffer, (size_t)ret,0);
                  /** Il n'y a plus d'espace dans le buffer d'envoie de TCP **/
                  if((ds < 0) || (ds < ret)){
                    failed_send = 1;

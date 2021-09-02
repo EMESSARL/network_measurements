@@ -16,7 +16,7 @@
 
 static double start_time;
 static double nb_bytes_sent;
-static int nb_bytes_recv;
+static ssize_t nb_bytes_recv;
 static int sent_dataMB;
 static int recv_dataMB;
 static double last_sent_time;
@@ -26,10 +26,10 @@ static int sent_log;
 static char logger[40][50];
 static int logger_iter = 0; 
 
-static int log_data(int fd, double nbytes, int *nMB, double *lasttime);
+static int log_data(int fd, size_t nbytes, int *nMB, double *lasttime);
 
 int msg_receive(int from, struct message *m){
-  int ret;
+  ssize_t ret;
   char *buff = malloc(sizeof(struct message));
   ret = recv(from, buff, sizeof(struct message), 0);
   if(ret < 0)
@@ -42,7 +42,7 @@ int msg_receive(int from, struct message *m){
   memcpy(&m->params,         buff+SL+SL+SL+SL, m->params_len);
   memcpy(&m->result_str,     buff+SL+SL+SL+SL+m->params_len, m->result_str_len);
   nb_bytes_recv += ret;
-  log_data(recv_log, nb_bytes_recv, &recv_dataMB, &last_recv_time);
+  log_data(recv_log, (size_t)nb_bytes_recv, &recv_dataMB, &last_recv_time);
   free(buff);
   return OK;
 }
@@ -56,12 +56,12 @@ int msg_send(int to, struct message *m){
   memcpy(buff+SL+SL+SL+SL, m->params, m->params_len);
   memcpy(buff+SL+SL+SL+SL+m->params_len, m->result_str, m->result_str_len);
   
-  int ret = send(to, buff, sizeof(struct message),0);
-  fprintf(stderr, "%ld:%ld:%ld:%ld:%s:%s\n", m->opcode, m->result, m->params_len, m->result_str_len, m->params, m->result_str);
+  ssize_t ret = send(to, buff, sizeof(struct message),0);
+  fprintf(stderr, "%ld:%ld:%lu:%lu:%s:%s\n", m->opcode, m->result, m->params_len, m->result_str_len, m->params, m->result_str);
   if(ret < 0)
     return E_IO;
   nb_bytes_sent += 2;
-  log_data(sent_log, nb_bytes_sent, &sent_dataMB, &last_sent_time);
+  log_data(sent_log, (size_t)nb_bytes_sent, &sent_dataMB, &last_sent_time);
   free(buff);
   return OK;
 }
@@ -70,7 +70,7 @@ int msg_send(int to, struct message *m){
 double gettime_ms(void){
   struct timeval tv1;
   gettimeofday(&tv1, NULL);
-  return (tv1.tv_sec * 1000000 + tv1.tv_usec);
+  return (double)(tv1.tv_sec * 1000000 + tv1.tv_usec);
 }
 
 void init_params(int recv_log_, int sent_log_){
@@ -85,7 +85,7 @@ void init_params(int recv_log_, int sent_log_){
   sent_log = sent_log_;
 }
 
-static int log_data(int fd, double nbytes, int *nMB, double *lasttime){
+static int log_data(int fd, size_t nbytes, int *nMB, double *lasttime){
   int ret = -1;
   if((int)(nbytes/10000000) > *nMB){ 
     (*nMB)++;
@@ -100,7 +100,7 @@ static int log_data(int fd, double nbytes, int *nMB, double *lasttime){
 
 int set_recv_data(int recv_data){
   nb_bytes_recv = recv_data;
-  return log_data(recv_log, nb_bytes_recv, &recv_dataMB, &last_recv_time);
+  return log_data(recv_log, (size_t)nb_bytes_recv, &recv_dataMB, &last_recv_time);
 }
 
 int print_recv_log(void){
@@ -117,7 +117,7 @@ int print_sent_log(void){
   return ret;
 }
 
-int handle_msg(struct message *m_in, struct message *m_out, int data_sd){
+int handle_msg(struct message *m_in, struct message *m_out){
   int fd;
   //char buffer[BUF_SIZE];
   int ret = -1;
